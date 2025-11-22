@@ -1,5 +1,5 @@
 # backend/orders/views.py
-
+from downloads.models import PurchaseItem
 import uuid
 from decimal import Decimal
 
@@ -11,8 +11,9 @@ from rest_framework.views import APIView
 from .models import Cart, CartItem, Order, OrderItem
 from .serializers import CartSerializer, CartItemAddSerializer, OrderSerializer
 from accounts.models import Address
-from downloads.models import PurchaseItem
 from payments.models import Payment
+from coupons.models import Coupon, CouponRedemption
+from coupons.utils import calculate_coupon_discount
 
 
 def generate_order_number() -> str:
@@ -52,8 +53,8 @@ class CartItemAddView(APIView):
         serializer = CartItemAddSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        book = serializer.validated_data['book']
-        quantity = serializer.validated_data['quantity']
+        book = serializer.validated_data["book"]
+        quantity = serializer.validated_data["quantity"]
 
         # unit price from book.effective_price
         unit_price = Decimal(book.effective_price)
@@ -62,7 +63,7 @@ class CartItemAddView(APIView):
         item, created = CartItem.objects.get_or_create(
             cart=cart,
             book=book,
-            defaults={'quantity': quantity, 'unit_price': unit_price},
+            defaults={"quantity": quantity, "unit_price": unit_price},
         )
         if not created:
             item.quantity += quantity
@@ -85,20 +86,24 @@ class CartItemUpdateView(APIView):
 
     def patch(self, request, pk, *args, **kwargs):
         try:
-            item = CartItem.objects.select_related('cart').get(
+            item = CartItem.objects.select_related("cart").get(
                 pk=pk,
                 cart__user=request.user,
             )
         except CartItem.DoesNotExist:
-            return Response({'detail': 'Item not found.'},
-                            status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Item not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-        quantity = request.data.get('quantity')
+        quantity = request.data.get("quantity")
         try:
             quantity = int(quantity)
         except (TypeError, ValueError):
-            return Response({'detail': 'Quantity must be an integer.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Quantity must be an integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if quantity <= 0:
             item.delete()
@@ -112,13 +117,15 @@ class CartItemUpdateView(APIView):
 
     def delete(self, request, pk, *args, **kwargs):
         try:
-            item = CartItem.objects.select_related('cart').get(
+            item = CartItem.objects.select_related("cart").get(
                 pk=pk,
                 cart__user=request.user,
             )
         except CartItem.DoesNotExist:
-            return Response({'detail': 'Item not found.'},
-                            status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Item not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         cart = item.cart
         item.delete()
@@ -128,22 +135,7 @@ class CartItemUpdateView(APIView):
 
 
 class CheckoutView(APIView):
-    """
-    POST /api/checkout/
-    Body (optional):
-    {
-      "billing_address_id": 1,
-      "payment_method": "bkash"
-    }
-
-    For now:
-    - creates Order
-    - creates OrderItems
-    - marks Order as PAID immediately (fake payment success)
-    - creates PurchaseItem (user owns ebooks)
-    - clears cart
-    - creates Payment record with status SUCCESS
-    """
+    
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
@@ -157,6 +149,7 @@ class CheckoutView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # 1) billing address
         billing_address = None
         billing_address_id = request.data.get('billing_address_id')
         if billing_address_id:
@@ -165,25 +158,65 @@ class CheckoutView(APIView):
                 user=user
             ).first()
 
-        payment_method = request.data.get('payment_method', '')
+        # 2) payment info from frontend
+        payment_method = request.data.get('payment_method', 'manual_bkash')
+        payer_number = request.data.get('payer_number', '').strip()
+        transaction_id = request.data.get('transaction_id', '').strip()
+        customer_note = request.data.get('customer_note', '').strip()
 
-        # calculate total
+        # 3) calculate total BEFORE coupon
         total = Decimal('0.00')
         for item in cart_items:
             total += item.subtotal
 
+        # 4) coupon
+        coupon_code = request.data.get('coupon_code')
+        coupon = None
+        discount_amount = Decimal('0.00')
+
+        if coupon_code:
+            try:
+                coupon = Coupon.objects.get(code__iexact=coupon_code.strip())
+            except Coupon.DoesNotExist:
+                return Response(
+                    {'detail': 'Invalid coupon code.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not coupon.is_valid_now():
+                return Response(
+                    {'detail': 'Coupon is not currently valid.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # optional: one use per user
+            if CouponRedemption.objects.filter(
+                coupon=coupon,
+                user=user
+            ).exists():
+                return Response(
+                    {'detail': 'You have already used this coupon.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            discount_amount = calculate_coupon_discount(coupon, total)
+            total = max(Decimal('0.00'), total - discount_amount)
+        
+
+    
+        # 5) create order (payment still pending)
         order = Order.objects.create(
             user=user,
             order_number=generate_order_number(),
-            status=Order.Status.PAID,   # pretend success for now
+            status=Order.Status.PENDING,  # waiting for payment confirmation
             total_amount=total,
             currency='BDT',
             payment_method=payment_method,
             billing_address=billing_address,
-            paid_at=timezone.now(),
         )
 
-        # create order items + purchase items
+        # 6) create order items + "pending" purchase items (not active yet)
+                # 6) create order items + "pending" purchase items (not active yet)
         for item in cart_items:
             order_item = OrderItem.objects.create(
                 order=order,
@@ -192,27 +225,62 @@ class CheckoutView(APIView):
                 unit_price=item.unit_price,
                 subtotal=item.subtotal,
             )
-            PurchaseItem.objects.create(
+
+            # Because of unique_together (user, book), we must NOT always create.
+            purchase, created = PurchaseItem.objects.get_or_create(
                 user=user,
                 book=item.book,
-                order_item=order_item,
-                download_limit=None,  # unlimited for now
+                defaults={
+                    "order_item": order_item,
+                    "download_limit": None,
+                    "downloads_count": 0,
+                    "is_active": False,
+                },
             )
 
-        # clear cart
+            if not created:
+                # user already has this book → attach to latest order
+                purchase.order_item = order_item
+                purchase.is_active = False  # locked until payment success
+                purchase.save(update_fields=["order_item", "is_active"])
+
+        # 7) clear cart
         cart_items.delete()
 
-        # create payment record (fake success)
-        Payment.objects.create(
+        # 8) create payment record with status=INITIATED
+        payment = Payment.objects.create(
             order=order,
-            gateway=Payment.Gateway.OTHER,
+            gateway=payment_method,   # e.g. manual_bkash / manual_nagad
             amount=total,
             currency='BDT',
-            status=Payment.Status.SUCCESS,
+            status=Payment.Status.INITIATED,
+            payer_number=payer_number or None,
+            gateway_transaction_id=transaction_id or None,
+            customer_note=customer_note or "",
         )
 
+        # 9) record coupon redemption (if any)
+        if coupon and discount_amount > 0:
+            CouponRedemption.objects.create(
+                coupon=coupon,
+                user=user,
+                order=order,
+            )
+            coupon.uses_count = (coupon.uses_count or 0) + 1
+            coupon.save(update_fields=['uses_count'])
+
         serializer = OrderSerializer(order)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        data = serializer.data
+        # attach payment status for frontend convenience
+        data['payment'] = {
+            'id': payment.id,
+            'status': payment.status,
+            'gateway': payment.gateway,
+            'payer_number': payment.payer_number,
+            'gateway_transaction_id': payment.gateway_transaction_id,
+        }
+        return Response(data, status=status.HTTP_201_CREATED)
+      
 
 
 class OrderListView(generics.ListAPIView):
@@ -224,9 +292,10 @@ class OrderListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return (Order.objects
-                .filter(user=self.request.user)
-                .order_by('-created_at'))
+        return (
+            Order.objects.filter(user=self.request.user)
+            .order_by("-created_at")
+        )
 
 
 class OrderDetailView(generics.RetrieveAPIView):

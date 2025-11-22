@@ -8,6 +8,7 @@ from catalog.serializers import BookListSerializer
 from catalog.models import Book
 from accounts.serializers import AddressSerializer
 from accounts.models import Address
+from payments.serializers import PaymentSerializer
 
 User = settings.AUTH_USER_MODEL
 
@@ -64,7 +65,7 @@ class OrderSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
-
+    payment = PaymentSerializer(read_only=True)
     class Meta:
         model = Order
         fields = [
@@ -79,6 +80,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'billing_address_id',
             'paid_at',
             'items',
+            'payment',
             'created_at',
             'updated_at',
         ]

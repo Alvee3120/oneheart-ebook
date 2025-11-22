@@ -29,6 +29,8 @@ class BookListSerializer(serializers.ModelSerializer):
     effective_price = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
     )
+    average_rating = serializers.FloatField(read_only=True)
+    reviews_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Book
@@ -43,6 +45,8 @@ class BookListSerializer(serializers.ModelSerializer):
             'currency',
             'authors',
             'is_published',
+            'average_rating',
+            'reviews_count',
         ]
 
 
@@ -53,6 +57,8 @@ class BookDetailSerializer(serializers.ModelSerializer):
     effective_price = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
     )
+    average_rating = serializers.FloatField(read_only=True)
+    reviews_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Book
@@ -77,5 +83,6 @@ class BookDetailSerializer(serializers.ModelSerializer):
             'is_published',
             'created_at',
             'updated_at',
+            'average_rating',
+            'reviews_count',
         ]
-        read_only_fields = ['created_at', 'updated_at']

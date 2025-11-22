@@ -1,7 +1,9 @@
 from datetime import timedelta
 import secrets
+from pathlib import Path
 
 from django.conf import settings
+from django.urls import reverse
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -9,33 +11,33 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.throttles import DownloadThrottle
 from .models import PurchaseItem, DownloadLink, DownloadLog
 from .serializers import PurchaseItemSerializer
+
 
 class LibraryListView(generics.ListAPIView):
     """
     GET /api/library/
-    -> list of ebooks the current user owns
+    -> list of ebooks the current user owns (both active & pending)
+    Frontend will show "Payment pending" if !is_active or payment_status != success.
     """
     serializer_class = PurchaseItemSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return (PurchaseItem.objects
-                .filter(user=self.request.user, is_active=True)
-                .select_related('book'))
+        return (
+            PurchaseItem.objects
+            .filter(user=self.request.user)  # ❗ no is_active filter here
+            .select_related('book', 'order_item__order')
+            .order_by('-purchased_at')
+        )
+
 
 class GenerateDownloadLinkView(APIView):
     """
-    POST /api/library/<int:pk>/download-link/
-    pk = PurchaseItem id
-
-    Returns:
-    {
-      "token": "...",
-      "url": "http://127.0.0.1:8000/api/download/<token>/",
-      "expires_at": "..."
-    }
+    POST /api/library/<purchase_item_id>/download-link/
+    Only works for active (paid/approved) purchases.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -44,91 +46,84 @@ class GenerateDownloadLinkView(APIView):
             PurchaseItem,
             pk=pk,
             user=request.user,
-            is_active=True,
+            is_active=True,  # only allow download for activated purchase
         )
 
-        if not purchase_item.can_download():
-            return Response(
-                {"detail": "Download limit reached."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # create short-lived token (10 minutes)
+        # generate a fresh random token
         token = secrets.token_urlsafe(32)
+        # ❗ use datetime.timedelta, not timezone.timedelta
         expires_at = timezone.now() + timedelta(minutes=10)
 
         link = DownloadLink.objects.create(
             purchase_item=purchase_item,
             token=token,
             expires_at=expires_at,
-            is_used_once=False,  # if you want one-time links, set True and handle below
+            is_used_once=False,  # can be reused while valid
         )
 
-        url = request.build_absolute_uri(f"/api/download/{link.token}/")
+        download_url = request.build_absolute_uri(
+            reverse("download-ebook", args=[token])
+        )
 
         return Response(
             {
-                "token": link.token,
-                "url": url,
-                "expires_at": link.expires_at,
+                "token": token,
+                "download_url": download_url,
+                "expires_at": expires_at,
             },
             status=status.HTTP_201_CREATED,
         )
+
+
 class DownloadEbookView(APIView):
     """
     GET /api/download/<token>/
-    Needs:
-      - valid token
-      - logged-in owner user
+    - does NOT require JWT (token itself is secret)
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = []  # token-based
+    throttle_classes = [DownloadThrottle]
 
     def get(self, request, token, *args, **kwargs):
-        link = get_object_or_404(DownloadLink, token=token)
-        purchase_item = link.purchase_item
+        # 1) find link with this token
+        link = get_object_or_404(
+            DownloadLink.objects.select_related("purchase_item__book"),
+            token=token,
+        )
 
-        # Ensure the link belongs to the current user
-        if purchase_item.user != request.user:
-            raise Http404("Not found")
-
-        # Check token validity & expiry
-        if not link.is_valid():
+        # 2) check expiry
+        if link.expires_at and link.expires_at < timezone.now():
+            # delete expired link so it can’t be reused
+            link.delete()
             return Response(
                 {"detail": "Download link has expired."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check download limit
-        if not purchase_item.can_download():
-            return Response(
-                {"detail": "Download limit reached."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        purchase_item = link.purchase_item
+        book = purchase_item.book
 
-        book_file = purchase_item.book.file
-        if not book_file:
+        # 3) ensure file exists
+        if not book.file:
             raise Http404("File not found.")
 
-        # Log the download
+        # 4) log download + increment counter
         DownloadLog.objects.create(
             purchase_item=purchase_item,
             ip_address=request.META.get("REMOTE_ADDR"),
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
-
-        # Increase download counter
         purchase_item.downloads_count = (purchase_item.downloads_count or 0) + 1
         purchase_item.save(update_fields=["downloads_count"])
 
-        # If one-time links, you can delete or mark as used:
+        # 5) optionally make link one-time:
         if link.is_used_once:
             link.delete()
 
-        # Stream the file
-        # filename will be last part of path: books/files/xxx.pdf -> xxx.pdf
-        filename = book_file.name.split("/")[-1]
-        return FileResponse(
-            book_file.open("rb"),
+        # 6) stream file
+        filename = Path(book.file.name).name
+        response = FileResponse(
+            book.file.open("rb"),
             as_attachment=True,
             filename=filename,
         )
+        return response

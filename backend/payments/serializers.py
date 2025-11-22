@@ -4,6 +4,11 @@ from rest_framework import serializers
 from .models import Payment
 
 
+class ManualPaymentSubmitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ['payer_number', 'gateway_transaction_id', 'customer_note']
+
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
@@ -19,4 +24,9 @@ class PaymentSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['status',
+            'submitted_at',
+            'verified_by',
+            'verified_at',
+            'created_at',
+            'updated_at',]

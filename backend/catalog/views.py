@@ -1,5 +1,5 @@
 # backend/catalog/views.py
-
+from .filters import BookFilter
 from rest_framework import viewsets, permissions
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
@@ -34,27 +34,28 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 class BookViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    GET /api/books/  -> list books
-    GET /api/books/<slug>/  -> single book detail
+    GET /api/books/
+    GET /api/books/<slug>/
+
     Supports:
       - search: ?search=python
-      - filter by category: ?category=slug
-      - filter by tag: ?tag=slug
+      - filter by category: ?category=programming
+      - filter by tag: ?tag=django
+      - filter by language: ?language=Bangla
+      - file format: ?file_format=pdf
+      - price range: ?min_price=100&max_price=500
       - ordering: ?ordering=price or -price
     """
 
     queryset = Book.objects.filter(is_published=True).prefetch_related(
         "authors", "categories", "tags"
     )
-
     permission_classes = [permissions.AllowAny]
 
-    # Filter/Search
-    filter_backends = [SearchFilter, OrderingFilter, DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = BookFilter
     search_fields = ["title", "description", "authors__name", "tags__name"]
-    ordering_fields = ["price", "created_at"]
-    filterset_fields = ["categories__slug", "tags__slug", "file_format"]
-
+    ordering_fields = ["price", "discount_price", "created_at"]
     lookup_field = "slug"
 
     def get_serializer_class(self):

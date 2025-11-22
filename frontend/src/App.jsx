@@ -1,0 +1,40 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import CartPage from "./pages/CartPage";
+import { useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { loadUserFromToken } from "./features/auth/authSlice";
+import CheckoutPage from "./pages/CheckoutPage";
+import LibraryPage from "./pages/LibraryPage";
+
+
+function App() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(loadUserFromToken());
+  }, [dispatch]);
+
+  return (
+    <BrowserRouter>
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/library" element={<LibraryPage />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+export default App;

@@ -1,8 +1,8 @@
 from django.db import models
 from django.utils.text import slugify
-
+from .validators import validate_ebook_file_extension, validate_ebook_file_size
 from core.models import TimeStampedModel
-
+from django.db.models import Avg, Count
 
 class Author(TimeStampedModel):
     name = models.CharField(max_length=255)
@@ -61,13 +61,17 @@ class Book(TimeStampedModel):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     description = models.TextField()
-
+    file = models.FileField(
+        upload_to='books/files/',
+        validators=[validate_ebook_file_extension, validate_ebook_file_size],
+        blank=True,
+        null=True,
+    )
     authors = models.ManyToManyField(Author, related_name='books')
     categories = models.ManyToManyField(Category, related_name='books', blank=True)
     tags = models.ManyToManyField(Tag, related_name='books', blank=True)
 
     cover_image = models.ImageField(upload_to="books/covers/", blank=True, null=True)
-    file = models.FileField(upload_to="books/files/")
     sample_file = models.FileField(upload_to="books/samples/", blank=True, null=True)
 
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -94,3 +98,14 @@ class Book(TimeStampedModel):
     @property
     def effective_price(self):
         return self.discount_price if self.discount_price else self.price
+
+    @property
+    def average_rating(self):
+        from reviews.models import Review
+        data = Review.objects.filter(book=self, is_approved=True).aggregate(avg=Avg('rating'))
+        return data['avg'] or 0
+
+    @property
+    def reviews_count(self):
+        from reviews.models import Review
+        return Review.objects.filter(book=self, is_approved=True).count()

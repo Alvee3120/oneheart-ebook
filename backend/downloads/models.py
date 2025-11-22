@@ -20,7 +20,7 @@ class PurchaseItem(TimeStampedModel):
     download_limit = models.PositiveIntegerField(null=True, blank=True)
     downloads_count = models.PositiveIntegerField(default=0)
 
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('user', 'book')
