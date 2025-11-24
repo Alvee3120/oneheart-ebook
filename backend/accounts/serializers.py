@@ -7,6 +7,7 @@ from .models import Profile, Address
 User = get_user_model()
 
 
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -54,3 +55,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.save()
         return user
     
+class MeSerializer(serializers.Serializer):
+    user = UserSerializer(read_only=True)
+    profile = ProfileSerializer(read_only=True)
+    addresses = AddressSerializer(many=True, read_only=True)
+
+    class Meta:
+        fields = ["user", "profile", "addresses"]
+

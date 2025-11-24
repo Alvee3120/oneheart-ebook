@@ -9,7 +9,7 @@ import { useDispatch } from "react-redux";
 import { loadUserFromToken } from "./features/auth/authSlice";
 import CheckoutPage from "./pages/CheckoutPage";
 import LibraryPage from "./pages/LibraryPage";
-
+import ProfilePage from "./pages/ProfilePage";
 
 function App() {
   const dispatch = useDispatch();
@@ -30,6 +30,8 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/library" element={<LibraryPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+
           </Routes>
         </main>
       </div>

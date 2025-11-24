@@ -4,14 +4,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from core.throttles import LoginThrottle
-
+from rest_framework.permissions import IsAuthenticated
 from .models import Profile,Address
-from .serializers import (
-    RegisterSerializer,
-    UserSerializer,
-    ProfileSerializer,
-    AddressSerializer
-)
+from .serializers import RegisterSerializer,UserSerializer,ProfileSerializer,AddressSerializer, MeSerializer
 
 User = get_user_model()
 
@@ -29,44 +24,43 @@ class RegisterView(generics.CreateAPIView):
 
 
 class MeView(APIView):
-    """
-    GET /api/auth/me/           -> get current user + profile
-    PATCH /api/auth/me/         -> update profile fields only
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        user = request.user
-        # Ensure profile exists
-        profile, _ = Profile.objects.get_or_create(user=user)
+        from .serializers import MeSerializer
+        profile = request.user.profile
+        addresses = Address.objects.filter(user=request.user)
 
-        user_data = UserSerializer(user).data
-        profile_data = ProfileSerializer(profile).data
-
-        return Response({
-            "user": user_data,
-            "profile": profile_data,
+        serializer = MeSerializer({
+            "user": request.user,
+            "profile": profile,
+            "addresses": addresses,
         })
 
-    def patch(self, request, *args, **kwargs):
+        return Response(serializer.data)
+
+    def patch(self, request):
         user = request.user
-        profile, _ = Profile.objects.get_or_create(user=user)
+        profile = user.profile
 
-        # Only update profile fields, not user here
-        profile_serializer = ProfileSerializer(
-            profile,
-            data=request.data,
-            partial=True
-        )
-        profile_serializer.is_valid(raise_exception=True)
-        profile_serializer.save()
+        # update user fields
+        user.first_name = request.data.get("first_name", user.first_name)
+        user.last_name = request.data.get("last_name", user.last_name)
+        user.save()
 
-        user_data = UserSerializer(user).data
+        # update profile fields
+        profile.phone = request.data.get("phone", profile.phone)
+        profile.preferred_language = request.data.get("preferred_language", profile.preferred_language)
+        profile.save()
 
-        return Response({
-            "user": user_data,
-            "profile": profile_serializer.data,
-        })
+        addresses = Address.objects.filter(user=user)
+
+        data = {
+            "user": UserSerializer(user).data,
+            "profile": ProfileSerializer(profile).data,
+            "addresses": AddressSerializer(addresses, many=True).data,
+        }
+        return Response(data)
 
 class AddressListCreateView(generics.ListCreateAPIView):
     """
