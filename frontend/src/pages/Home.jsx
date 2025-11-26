@@ -2,9 +2,12 @@ import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { loadBooks } from "../features/books/booksSlice";
 import { addToCart } from "../features/cart/cartSlice";
+import { useNavigate } from "react-router-dom";
 
 export default function Home() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   const { items, loading, error } = useSelector((state) => state.books);
   const cartState = useSelector((state) => state.cart);
 
@@ -12,7 +15,8 @@ export default function Home() {
     dispatch(loadBooks());
   }, [dispatch]);
 
-  const handleAddToCart = (bookId) => {
+  const handleAddToCart = (e, bookId) => {
+    e.stopPropagation(); // Prevent clicking the card navigation
     dispatch(addToCart({ bookId, quantity: 1 }));
   };
 
@@ -31,7 +35,8 @@ export default function Home() {
         {items.map((book) => (
           <div
             key={book.id}
-            className="bg-white rounded-lg shadow p-4 flex flex-col"
+            onClick={() => navigate(`/books/${book.slug}`)}
+            className="bg-white rounded-lg shadow p-4 flex flex-col cursor-pointer hover:shadow-md transition"
           >
             {book.cover_image && (
               <img
@@ -40,15 +45,19 @@ export default function Home() {
                 className="h-40 object-cover rounded mb-3"
               />
             )}
+
             <h2 className="font-semibold mb-1">{book.title}</h2>
+
             <p className="text-sm text-slate-600 flex-1">
               {(book.description || "").slice(0, 80)}...
             </p>
+
             <div className="mt-3 font-bold">
               {(book.effective_price || book.price) + " " + (book.currency || "BDT")}
             </div>
+
             <button
-              onClick={() => handleAddToCart(book.id)}
+              onClick={(e) => handleAddToCart(e, book.id)}
               className="mt-3 bg-slate-900 text-white text-sm py-1.5 rounded hover:bg-slate-800"
             >
               Add to cart

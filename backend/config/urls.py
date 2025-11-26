@@ -1,3 +1,5 @@
+
+
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -14,6 +16,7 @@ urlpatterns = [
     path('api/', include('reviews.urls')),
     path('api/', include('coupons.urls')),
     path('api/', include('payments.urls')),
+    path("api/", include("blog.urls")),
 ]
 
 # Serve media files in development

@@ -1,18 +1,28 @@
 from django.contrib.auth import get_user_model
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
+
 from core.throttles import LoginThrottle
 from rest_framework.permissions import IsAuthenticated
-from .models import Profile,Address
-from .serializers import RegisterSerializer,UserSerializer,ProfileSerializer,AddressSerializer, MeSerializer
+
+from .models import Profile, Address
+from .serializers import (
+    RegisterSerializer,
+    UserSerializer,
+    ProfileSerializer,
+    AddressSerializer,
+    MeSerializer,
+)
 
 User = get_user_model()
 
+
 class ThrottledTokenObtainPairView(TokenObtainPairView):
     throttle_classes = [LoginThrottle]
-    
+
+
 class RegisterView(generics.CreateAPIView):
     """
     POST /api/auth/register/
@@ -24,43 +34,76 @@ class RegisterView(generics.CreateAPIView):
 
 
 class MeView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        from .serializers import MeSerializer
-        profile = request.user.profile
-        addresses = Address.objects.filter(user=request.user)
-
-        serializer = MeSerializer({
-            "user": request.user,
-            "profile": profile,
-            "addresses": addresses,
-        })
-
-        return Response(serializer.data)
-
-    def patch(self, request):
+        """
+        GET /api/auth/me/
+        Returns logged-in user's data + profile + addresses.
+        """
         user = request.user
-        profile = user.profile
 
-        # update user fields
-        user.first_name = request.data.get("first_name", user.first_name)
-        user.last_name = request.data.get("last_name", user.last_name)
-        user.save()
+        # Ensure profile always exists
+        profile, _ = Profile.objects.get_or_create(user=user)
 
-        # update profile fields
-        profile.phone = request.data.get("phone", profile.phone)
-        profile.preferred_language = request.data.get("preferred_language", profile.preferred_language)
-        profile.save()
+        # All addresses of this user (default ones first if you have these fields)
+        addresses = Address.objects.filter(user=user).order_by(
+            "-is_default", "-created_at"
+        )
 
-        addresses = Address.objects.filter(user=user)
+        serializer = MeSerializer(
+            {
+                "user": user,
+                "profile": profile,
+                "addresses": addresses,
+            }
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        data = {
-            "user": UserSerializer(user).data,
-            "profile": ProfileSerializer(profile).data,
-            "addresses": AddressSerializer(addresses, many=True).data,
+    def patch(self, request, *args, **kwargs):
+        """
+        PATCH /api/auth/me/
+        Partially update user + profile.
+        Expected fields (example):
+        {
+            "first_name": "...",
+            "last_name": "...",
+            "phone": "...",
+            "preferred_language": "..."
         }
-        return Response(data)
+        """
+        user = request.user
+        profile, _ = Profile.objects.get_or_create(user=user)
+
+        # Use serializers for validation instead of manual assignment
+        user_serializer = UserSerializer(user, data=request.data, partial=True)
+        profile_serializer = ProfileSerializer(profile, data=request.data, partial=True)
+
+        if not user_serializer.is_valid() or not profile_serializer.is_valid():
+            return Response(
+                {
+                    "user_errors": user_serializer.errors,
+                    "profile_errors": profile_serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user_serializer.save()
+        profile_serializer.save()
+
+        addresses = Address.objects.filter(user=user).order_by(
+            "-is_default", "-created_at"
+        )
+
+        me_serializer = MeSerializer(
+            {
+                "user": user,
+                "profile": profile,
+                "addresses": addresses,
+            }
+        )
+        return Response(me_serializer.data, status=status.HTTP_200_OK)
+
 
 class AddressListCreateView(generics.ListCreateAPIView):
     """
@@ -73,7 +116,7 @@ class AddressListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         # Only addresses of the logged-in user
         return Address.objects.filter(user=self.request.user).order_by(
-            '-is_default', '-created_at'
+            "-is_default", "-created_at"
         )
 
     def perform_create(self, serializer):

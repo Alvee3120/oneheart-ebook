@@ -26,6 +26,10 @@ export default function Navbar() {
           <Link to="/cart">
             Cart{itemCount ? ` (${itemCount})` : ""}
           </Link>
+          <Link to="/blog" className="text-sm font-medium text-slate-600 hover:text-sky-600">
+  Blog
+</Link>
+
 
           {isAuthenticated ? (
             <>

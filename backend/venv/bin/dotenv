@@ -1,4 +1,4 @@
-#!/media/alvee/Work/Ebook/backend/venv/bin/python3
+#!/media/alvee/MyWork/oneheart-ebook/backend/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys

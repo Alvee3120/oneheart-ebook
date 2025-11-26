@@ -47,6 +47,7 @@ class BookListSerializer(serializers.ModelSerializer):
             'is_published',
             'average_rating',
             'reviews_count',
+            'description',
         ]
 
 

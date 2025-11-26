@@ -10,6 +10,9 @@ import { loadUserFromToken } from "./features/auth/authSlice";
 import CheckoutPage from "./pages/CheckoutPage";
 import LibraryPage from "./pages/LibraryPage";
 import ProfilePage from "./pages/ProfilePage";
+import BlogListPage from "./pages/BlogListPage";
+import BlogDetailPage from "./pages/BlogDetailPage";
+import BookDetails from "./pages/BookDetails";
 
 function App() {
   const dispatch = useDispatch();
@@ -31,6 +34,10 @@ function App() {
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/library" element={<LibraryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/blog" element={<BlogListPage />} />
+            <Route path="/blog/:id" element={<BlogDetailPage />} />
+            <Route path="/books/:slug" element={<BookDetails />} />
+
 
           </Routes>
         </main>

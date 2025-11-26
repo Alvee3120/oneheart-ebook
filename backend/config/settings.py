@@ -36,7 +36,8 @@ INSTALLED_APPS = [
     'reviews',
     'coupons',
     'corsheaders',
-    'django_filters'
+    'django_filters',
+    'blog',
 ]
 
 MIDDLEWARE = [
