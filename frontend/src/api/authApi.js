@@ -28,3 +28,9 @@ export const updateMe = async (payload) => {
   const res = await axiosClient.patch("/auth/me/", payload);
   return res.data;
 };
+
+export const verifyEmailApi = (email, code) =>
+  axiosClient.post("/auth/verify-email/", { email, code });
+
+export const resendOtpApi = (email) =>
+  axiosClient.post("/auth/resend-otp/", { email });

@@ -13,9 +13,10 @@ export default function Register() {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, error } = useSelector(
-    (state) => state.auth
-  );
+ const { isAuthenticated, loading, error, registrationMessage } = useSelector(
+  (state) => state.auth
+);
+
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -29,8 +30,9 @@ export default function Register() {
     e.preventDefault();
     const result = await dispatch(register(form));
     if (register.fulfilled.match(result)) {
-      navigate("/");
-    }
+  navigate(`/verify-email?email=${encodeURIComponent(form.email)}`);
+}
+
   };
 
   return (
@@ -83,7 +85,7 @@ export default function Register() {
           disabled={loading}
           className="w-full bg-slate-900 text-white py-2 rounded text-sm hover:bg-slate-800 disabled:opacity-60"
         >
-          {loading ? "Creating..." : "Register"}
+          {loading ? "Sending OTP..." : "Register"}
         </button>
       </form>
     </div>

@@ -92,7 +92,23 @@ class EmailOTPVerifySerializer(serializers.Serializer):
         attrs["code"] = code
         return attrs
 
-    
+class ResendEmailOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"detail": "No user found with this email."})
+
+        if user.is_email_verified:
+            raise serializers.ValidationError({"detail": "This email is already verified."})
+
+        attrs["user"] = user
+        return attrs
+
+
 class MeSerializer(serializers.Serializer):
     user = UserSerializer(read_only=True)
     profile = ProfileSerializer(read_only=True)

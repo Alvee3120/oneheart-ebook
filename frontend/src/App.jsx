@@ -13,7 +13,7 @@ import ProfilePage from "./pages/ProfilePage";
 import BlogListPage from "./pages/BlogListPage";
 import BlogDetailPage from "./pages/BlogDetailPage";
 import BookDetails from "./pages/BookDetails";
-
+import VerifyEmail from "./pages/VerifyEmail";
 function App() {
   const dispatch = useDispatch();
 
@@ -30,6 +30,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/register" element={<Register />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/library" element={<LibraryPage />} />

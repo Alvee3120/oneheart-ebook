@@ -9,15 +9,19 @@ from datetime import timedelta
 from django.utils import timezone
 from core.throttles import LoginThrottle
 from rest_framework.permissions import IsAuthenticated
-
+from .models import EmailOTP
 from .models import Profile, Address
+from django.core.mail import send_mail
+from django.conf import settings
+
 from .serializers import (
     RegisterSerializer,
     UserSerializer,
     ProfileSerializer,
     AddressSerializer,
     MeSerializer,
-    EmailOTPVerifySerializer
+    EmailOTPVerifySerializer,
+    ResendEmailOTPSerializer,
 
 )
 
@@ -98,6 +102,52 @@ class VerifyEmailOTPView(APIView):
 
         return Response(
             {"detail": "Email verified successfully. You can now log in."},
+            status=status.HTTP_200_OK,
+        )
+
+class ResendEmailOTPView(APIView):
+    """
+    POST /api/auth/resend-otp/
+    Body: { "email": "" }
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ResendEmailOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+
+        # Optional rate limit: don't resend if last OTP < 60 seconds ago
+        last_otp = (
+            EmailOTP.objects.filter(user=user)
+            .order_by("-created_at")
+            .first()
+        )
+        if last_otp and (timezone.now() - last_otp.created_at).total_seconds() < 60:
+            return Response(
+                {"detail": "Please wait a bit before requesting a new code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Mark previous unused OTPs as used
+        EmailOTP.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        # Create new OTP
+        code = EmailOTP.generate_code()
+        EmailOTP.objects.create(user=user, code=code)
+
+        # Send email
+        send_mail(
+            subject="Your new OneHeart eBook verification code",
+            message=f"Your new verification code is: {code}\nThis code will expire in 10 minutes.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+
+        return Response(
+            {"detail": "A new verification code has been sent to your email."},
             status=status.HTTP_200_OK,
         )
 

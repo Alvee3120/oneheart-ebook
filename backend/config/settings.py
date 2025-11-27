@@ -199,5 +199,5 @@ EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "fazlah.alvee20@gmail.com"        
-EMAIL_HOST_PASSWORD = "drdl zwrm igfl dmtb"   
+EMAIL_HOST_PASSWORD = "your app pass"   
 DEFAULT_FROM_EMAIL = "OneHeart eBook fazlah.alvee20@gmail.com"
