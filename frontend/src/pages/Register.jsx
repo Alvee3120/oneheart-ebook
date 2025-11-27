@@ -1,3 +1,4 @@
+// frontend/src/pages/Register.jsx
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { register } from "../features/auth/authSlice";

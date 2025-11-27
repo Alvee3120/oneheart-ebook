@@ -1,9 +1,12 @@
+#backend/accounts/views.py
+
 from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-
+from datetime import timedelta
+from django.utils import timezone
 from core.throttles import LoginThrottle
 from rest_framework.permissions import IsAuthenticated
 
@@ -14,6 +17,8 @@ from .serializers import (
     ProfileSerializer,
     AddressSerializer,
     MeSerializer,
+    EmailOTPVerifySerializer
+
 )
 
 User = get_user_model()
@@ -31,6 +36,71 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        return Response(
+            {
+                "detail": "We sent a verification code to your email. Please verify to activate your account.",
+                "email": user.email,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+class VerifyEmailOTPView(APIView):
+    """
+    POST /api/auth/verify-email/
+    Body: { "email": "", "code": "" }
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = EmailOTPVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+        code = serializer.validated_data["code"]
+
+        otp_obj = (
+            EmailOTP.objects.filter(user=user, code=code, is_used=False)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not otp_obj:
+            return Response(
+                {"detail": "Invalid verification code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # expiry 10 minutes
+        if otp_obj.created_at < timezone.now() - timedelta(minutes=10):
+            return Response(
+                {"detail": "Verification code has expired. Please request a new one."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Mark OTP & user as verified
+        otp_obj.is_used = True
+        otp_obj.save()
+
+        user.is_active = True
+        user.is_email_verified = True
+        user.save()
+
+        # also update Profile.is_verified if exists
+        profile, _ = Profile.objects.get_or_create(user=user)
+        profile.is_verified = True
+        profile.save()
+
+        return Response(
+            {"detail": "Email verified successfully. You can now log in."},
+            status=status.HTTP_200_OK,
+        )
+
 
 
 class MeView(APIView):

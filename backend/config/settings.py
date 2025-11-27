@@ -191,3 +191,13 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+
+# 📧 Email settings (use environment variables in real project)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "fazlah.alvee20@gmail.com"        
+EMAIL_HOST_PASSWORD = "drdl zwrm igfl dmtb"   
+DEFAULT_FROM_EMAIL = "OneHeart eBook fazlah.alvee20@gmail.com"
