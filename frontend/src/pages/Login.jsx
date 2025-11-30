@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { login } from "../features/auth/authSlice";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useNavigate, Navigate, Link } from "react-router-dom";
+
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -56,12 +57,20 @@ export default function Login() {
         </label>
 
         <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-slate-900 text-white py-2 rounded text-sm hover:bg-slate-800 disabled:opacity-60"
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
+  type="submit"
+  disabled={loading}
+  className="w-full bg-slate-900 text-white py-2 rounded text-sm hover:bg-slate-800 disabled:opacity-60"
+>
+  {loading ? "Logging in..." : "Login"}
+</button>
+
+<div className="mt-3 text-right">
+  <Link to="/forgot-password" className="text-xs text-slate-700 hover:underline">
+    Forgot password?
+  </Link>
+</div>
+
+
       </form>
     </div>
   );

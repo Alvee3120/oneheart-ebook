@@ -3,8 +3,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import Profile, Address, EmailOTP  # 👈 add EmailOTP
-from .models import Profile, Address
+from .models import Profile, Address, EmailOTP, PasswordResetCode
+from django.db.models import Q
 
 User = get_user_model()
 
@@ -106,6 +106,54 @@ class ResendEmailOTPSerializer(serializers.Serializer):
             raise serializers.ValidationError({"detail": "This email is already verified."})
 
         attrs["user"] = user
+        return attrs
+
+class ForgotPasswordRequestSerializer(serializers.Serializer):
+    """
+    User can enter username OR email.
+    """
+    identifier = serializers.CharField()
+
+    def validate(self, attrs):
+        identifier = attrs.get("identifier", "").strip()
+
+        try:
+            user = User.objects.get(
+                Q(email__iexact=identifier) | Q(username__iexact=identifier)
+            )
+        except User.DoesNotExist:
+            # you can return generic message to avoid user enumeration
+            raise serializers.ValidationError(
+                {"detail": "No account found with this username/email."}
+            )
+
+        if not user.is_email_verified:
+            raise serializers.ValidationError(
+                {"detail": "Email is not verified. Please verify your email first."}
+            )
+
+        attrs["user"] = user
+        return attrs
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(write_only=True, min_length=6)
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        code = attrs.get("code")
+        new_password = attrs.get("new_password")
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"detail": "Invalid email or code."})
+
+        attrs["user"] = user
+        attrs["code"] = code
+        attrs["new_password"] = new_password
         return attrs
 
 

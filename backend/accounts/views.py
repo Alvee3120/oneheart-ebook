@@ -9,8 +9,7 @@ from datetime import timedelta
 from django.utils import timezone
 from core.throttles import LoginThrottle
 from rest_framework.permissions import IsAuthenticated
-from .models import EmailOTP
-from .models import Profile, Address
+from .models import Profile, Address, EmailOTP, PasswordResetCode
 from django.core.mail import send_mail
 from django.conf import settings
 
@@ -22,6 +21,8 @@ from .serializers import (
     MeSerializer,
     EmailOTPVerifySerializer,
     ResendEmailOTPSerializer,
+    ForgotPasswordRequestSerializer, 
+    ResetPasswordSerializer,
 
 )
 
@@ -151,6 +152,109 @@ class ResendEmailOTPView(APIView):
             status=status.HTTP_200_OK,
         )
 
+class ForgotPasswordRequestView(APIView):
+    """
+    POST /api/auth/forgot-password/
+    Body: { "identifier": "<username or email>" }
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ForgotPasswordRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+
+        # Rate limit: if last reset < 60 seconds ago, block
+        last_code = (
+            PasswordResetCode.objects.filter(user=user)
+            .order_by("-created_at")
+            .first()
+        )
+        if last_code and (timezone.now() - last_code.created_at).total_seconds() < 60:
+            return Response(
+                {"detail": "Please wait a bit before requesting a new reset code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Mark previous unused reset codes as used
+        PasswordResetCode.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        # Create new reset code
+        code = PasswordResetCode.generate_code()
+        PasswordResetCode.objects.create(user=user, code=code)
+
+        # Send email
+        send_mail(
+            subject="Your OneHeart eBook password reset code",
+            message=(
+                f"You requested to reset your password.\n"
+                f"Your password reset code is: {code}\n"
+                f"This code will expire in 10 minutes."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+
+        return Response(
+            {
+                "detail": "If an account exists, a password reset code has been sent to the associated email.",
+                "email": user.email,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class ResetPasswordView(APIView):
+    """
+    POST /api/auth/reset-password/
+    Body: { "email": "", "code": "", "new_password": "" }
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
+        code = serializer.validated_data["code"]
+        new_password = serializer.validated_data["new_password"]
+
+        reset_obj = (
+            PasswordResetCode.objects.filter(
+                user=user,
+                code=code,
+                is_used=False,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not reset_obj:
+            return Response(
+                {"detail": "Invalid reset code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # expiry 10 minutes
+        if reset_obj.created_at < timezone.now() - timedelta(minutes=10):
+            return Response(
+                {"detail": "Reset code has expired. Please request a new one."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Mark used
+        reset_obj.is_used = True
+        reset_obj.save()
+
+        # Set new password
+        user.set_password(new_password)
+        user.save()
+
+        return Response(
+            {"detail": "Password has been reset successfully. You can now log in."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class MeView(APIView):

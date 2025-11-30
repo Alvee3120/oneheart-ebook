@@ -14,6 +14,9 @@ import BlogListPage from "./pages/BlogListPage";
 import BlogDetailPage from "./pages/BlogDetailPage";
 import BookDetails from "./pages/BookDetails";
 import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+
 function App() {
   const dispatch = useDispatch();
 
@@ -38,6 +41,8 @@ function App() {
             <Route path="/blog" element={<BlogListPage />} />
             <Route path="/blog/:id" element={<BlogDetailPage />} />
             <Route path="/books/:slug" element={<BookDetails />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} /> 
 
 
           </Routes>

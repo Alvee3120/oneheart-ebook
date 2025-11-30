@@ -1,3 +1,4 @@
+# backend/config/settings.py
 
 from datetime import timedelta
 from pathlib import Path
@@ -187,17 +188,22 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = ["*"]
 CORS_ALLOW_METHODS = ["*"]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+# CORS_ALLOWED_ORIGINS = [
+# "https://hn3v71nt-5173.asse.devtunnels.ms",
+# "https://hn3v71nt-8000.asse.devtunnels.ms",
+# "https://*.devtunnels.ms",
+# "http://localhost:5173/"
+# ]
+
+ALLOWED_HOSTS = ["*"]
 
 
-# 📧 Email settings (use environment variables in real project)
+
+
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
+EMAIL_HOST = "smtp-relay.brevo.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "fazlah.alvee20@gmail.com"        
-EMAIL_HOST_PASSWORD = "your app pass"   
-DEFAULT_FROM_EMAIL = "OneHeart eBook fazlah.alvee20@gmail.com"
+EMAIL_HOST_USER = ""
+EMAIL_HOST_PASSWORD = ""   
+DEFAULT_FROM_EMAIL = "no-reply@oneheartbd.com"

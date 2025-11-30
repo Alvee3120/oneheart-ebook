@@ -72,3 +72,21 @@ class EmailOTP(models.Model):
     def generate_code(length=6):
         # numeric only, easier for users
         return ''.join(random.choices(string.digits, k=length))
+    
+class PasswordResetCode(models.Model):
+    user = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        related_name='password_reset_codes'
+    )
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Password reset code for {self.user.email} - {self.code}"
+
+    @staticmethod
+    def generate_code(length=6):
+        # reuse same style: numeric only
+        return ''.join(random.choices(string.digits, k=length))
