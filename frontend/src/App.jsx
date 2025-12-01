@@ -13,7 +13,10 @@ import ProfilePage from "./pages/ProfilePage";
 import BlogListPage from "./pages/BlogListPage";
 import BlogDetailPage from "./pages/BlogDetailPage";
 import BookDetails from "./pages/BookDetails";
+import BooksPage from "./pages/BooksPage";
+import Footer from "./components/Footer";
 import VerifyEmail from "./pages/VerifyEmail";
+
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 
@@ -33,20 +36,22 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/register" element={<Register />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/library" element={<LibraryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/blog" element={<BlogListPage />} />
             <Route path="/blog/:id" element={<BlogDetailPage />} />
+            <Route path="/books" element={<BooksPage />} />
             <Route path="/books/:slug" element={<BookDetails />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} /> 
 
-
           </Routes>
         </main>
+        <Footer />
       </div>
     </BrowserRouter>
   );

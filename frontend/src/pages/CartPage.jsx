@@ -48,32 +48,42 @@ export default function CartPage() {
             {cart.items.map((item) => (
               <div
                 key={item.id}
-                className="bg-white shadow rounded-lg p-4 flex items-center justify-between"
+                className="bg-white shadow rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
-                <div>
-                  <div className="font-semibold">
-                    {item.book?.title || "Book"}
-                  </div>
-                  <div className="text-sm text-slate-600">
-                    Unit: {item.unit_price} {item.book?.currency || "BDT"}
+                <div className="flex items-center gap-4">
+                  {/* Optional: Add image here if available in item.book.cover_image */}
+                  {item.book?.cover_image && (
+                    <img src={item.book.cover_image} alt={item.book.title} className="w-12 h-16 object-cover rounded" />
+                  )}
+                  <div>
+                    <div className="font-semibold text-gray-900">
+                      {item.book?.title || "Book"}
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      Unit: {item.unit_price} {item.book?.currency || "BDT"}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="1"
-                    className="w-16 border rounded px-2 py-1 text-sm"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      handleQuantityChange(item.id, e.target.value)
-                    }
-                  />
-                  <div className="font-semibold">
+
+                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-500 sm:hidden">Qty:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-16 border rounded px-2 py-1 text-sm"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        handleQuantityChange(item.id, e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="font-semibold text-gray-900">
                     {item.subtotal} {item.book?.currency || "BDT"}
                   </div>
                   <button
                     onClick={() => handleRemove(item.id)}
-                    className="text-red-600 text-sm"
+                    className="text-red-600 text-sm hover:underline"
                   >
                     Remove
                   </button>
